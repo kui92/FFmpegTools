@@ -21,6 +21,7 @@ public class FfmpegTool {
     /**
      * 执行FFmpeg命令
      * @param cmd
+     *
      * @return
      */
     public static native int cmdRun(String[] cmd);

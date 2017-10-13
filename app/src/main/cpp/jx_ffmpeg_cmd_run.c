@@ -99,6 +99,15 @@ JNIEXPORT jint JNICALL Java_com_esay_ffmtool_FfmpegTool_decodToImage
     LOGD("start_time:%d",pFormatCtx->start_time);
     LOGD("pFormatCtx den:%d", pFormatCtx->streams[videoStream]->sample_aspect_ratio.den);
     LOGD("pFormatCtx num:%d", pFormatCtx->streams[videoStream]->sample_aspect_ratio.num);
+    AVDictionaryEntry *tag = NULL;
+    tag = av_dict_get(pFormatCtx->streams[videoStream]->metadata, "rotate", tag, 0);
+    if (tag != NULL){
+        LOGD("tag key:%s",tag->key);
+        LOGD("tag value:%s",tag->value);
+    } else{
+        LOGD("tag==null");
+    }
+
     av_seek_frame(pFormatCtx,-1,(int64_t)count*AV_TIME_BASE,AVSEEK_FLAG_FRAME);
     while (av_read_frame(pFormatCtx, &packet) >= 0){
         if (packet.stream_index == videoStream){

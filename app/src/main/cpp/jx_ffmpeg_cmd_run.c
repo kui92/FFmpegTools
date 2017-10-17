@@ -112,17 +112,10 @@ JNIEXPORT jint JNICALL Java_com_esay_ffmtool_FfmpegTool_decodToImage
 
      } else{
          LOGD("tag==null");
-     }*/
-    int time =count;
-    int seek=0;
-    do{
-        seek=av_seek_frame(pFormatCtx,-1,(int64_t)time*AV_TIME_BASE,AVSEEK_FLAG_FRAME);
-        time--;
-    }while (seek!=0);
+     }*/av_seek_frame(pFormatCtx,-1,count*AV_TIME_BASE,AVSEEK_FLAG_BACKWARD);
 
     int ret=0;
     while ((ret=av_read_frame(pFormatCtx, &packet))>= 0){
-        LOGD("-------------------:count:%d   startTime:%d  num:%d  ret:%d",count,startTime,num,ret);
         if (packet.stream_index == videoStream){
             // Decode video frame
             avcodec_decode_video2(pCodecCtx, pFrame, &frameFinished, &packet);
@@ -133,11 +126,7 @@ JNIEXPORT jint JNICALL Java_com_esay_ffmtool_FfmpegTool_decodToImage
                     MyWriteJPEG(pFrame,parent, pCodecCtx->width,
                                 pCodecCtx->height, count);
                     ++count;
-                    time=count;
-                    do{
-                        seek=av_seek_frame(pFormatCtx,-1,(int64_t)time*AV_TIME_BASE,AVSEEK_FLAG_FRAME);
-                        time--;
-                    }while (seek!=0);
+                    av_seek_frame(pFormatCtx,-1,count*AV_TIME_BASE,AVSEEK_FLAG_BACKWARD);
                 } else{
                     av_packet_unref(&packet);
                     LOGD("break:count:%d   startTime:%d  num:%d",count,startTime,num);
@@ -148,7 +137,7 @@ JNIEXPORT jint JNICALL Java_com_esay_ffmtool_FfmpegTool_decodToImage
         }
         av_packet_unref(&packet);
     }
-    LOGD("12122123123123123123:count:%d   startTime:%d  num:%d  ret:%d",count,startTime,num,ret);
+    LOGD(":count:%d   startTime:%d  num:%d  ret:%d",count,startTime,num,ret);
     // Free the YUV frame
     av_free(pFrame);
     // Close the codecs

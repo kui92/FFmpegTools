@@ -208,9 +208,6 @@ int MyWriteJPEG(AVFrame *pFrame,char *path,  int width, int height, int iIndex) 
         return -1;
     }
 
-    int ret2 = av_dict_set(&pFormatCtx->metadata,"rotate","90",0);
-    LOGD("tag 修改:%d",ret2);
-
     //Write Header
     avformat_write_header(pFormatCtx, NULL);
 

@@ -9,7 +9,7 @@
 #include "com_mabeijianxi_jianxiffmpegcmd_Test.h"
 #include "com_esay_ffmtool_FfmpegTool.h"
 #include <android/log.h>
-#define  LOG_TAG    "videoplayer"
+#define  LOG_TAG    "ImageEncf"
 #define  LOGD(...)  __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
 JNIEXPORT jint JNICALL
 Java_com_esay_ffmtool_FfmpegTool_cmdRun(JNIEnv *env, jobject type,
@@ -95,34 +95,52 @@ JNIEXPORT jint JNICALL Java_com_esay_ffmtool_FfmpegTool_decodToImage
     int frameFinished;
     //(*pCodecCtx).
     AVPacket packet;
+    AVDictionaryEntry *m = NULL;
+    while(m=av_dict_get(pFormatCtx->metadata,"",m,AV_DICT_IGNORE_SUFFIX)){
+        LOGD("key:%s    value:%s",m->key,m->value);
+    }
 
+    /*
     LOGD("start_time:%d",pFormatCtx->start_time);
     LOGD("pFormatCtx den:%d", pFormatCtx->streams[videoStream]->sample_aspect_ratio.den);
     LOGD("pFormatCtx num:%d", pFormatCtx->streams[videoStream]->sample_aspect_ratio.num);
-    AVDictionaryEntry *tag = NULL;
-    tag = av_dict_get(pFormatCtx->streams[videoStream]->metadata, "rotate", tag, 0);
-    if (tag != NULL){
-        LOGD("tag key:%s",tag->key);
-        LOGD("tag value:%s",tag->value);
-    } else{
-        LOGD("tag==null");
-    }
+     * AVDictionaryEntry *tag = NULL;
+     tag = av_dict_get(pFormatCtx->streams[videoStream]->metadata, "rotate", tag, 0);
+     if (tag != NULL){
+         LOGD("tag key:%s",tag->key);
+         LOGD("tag value:%s",tag->value);
 
-    av_seek_frame(pFormatCtx,-1,(int64_t)count*AV_TIME_BASE,AVSEEK_FLAG_FRAME);
-    while (av_read_frame(pFormatCtx, &packet) >= 0){
+     } else{
+         LOGD("tag==null");
+     }*/
+    int time =count;
+    int seek=0;
+    do{
+        seek=av_seek_frame(pFormatCtx,-1,(int64_t)time*AV_TIME_BASE,AVSEEK_FLAG_FRAME);
+        time--;
+    }while (seek!=0);
+
+    int ret=0;
+    while ((ret=av_read_frame(pFormatCtx, &packet))>= 0){
+        LOGD("-------------------:count:%d   startTime:%d  num:%d  ret:%d",count,startTime,num,ret);
         if (packet.stream_index == videoStream){
             // Decode video frame
             avcodec_decode_video2(pCodecCtx, pFrame, &frameFinished, &packet);
             // 并不是decode一次就可解码出一帧
             if (frameFinished){
                 if(count<(startTime+num)){
+
                     MyWriteJPEG(pFrame,parent, pCodecCtx->width,
                                 pCodecCtx->height, count);
                     ++count;
-                    av_seek_frame(pFormatCtx,-1,(int64_t)count*AV_TIME_BASE,AVSEEK_FLAG_FRAME);
+                    time=count;
+                    do{
+                        seek=av_seek_frame(pFormatCtx,-1,(int64_t)time*AV_TIME_BASE,AVSEEK_FLAG_FRAME);
+                        time--;
+                    }while (seek!=0);
                 } else{
                     av_packet_unref(&packet);
-                    LOGD("break:");
+                    LOGD("break:count:%d   startTime:%d  num:%d",count,startTime,num);
                     break;
                 }
 
@@ -130,6 +148,7 @@ JNIEXPORT jint JNICALL Java_com_esay_ffmtool_FfmpegTool_decodToImage
         }
         av_packet_unref(&packet);
     }
+    LOGD("12122123123123123123:count:%d   startTime:%d  num:%d  ret:%d",count,startTime,num,ret);
     // Free the YUV frame
     av_free(pFrame);
     // Close the codecs
@@ -149,11 +168,12 @@ JNIEXPORT jint JNICALL Java_com_esay_ffmtool_FfmpegTool_decodToImage
  *
  */
 int MyWriteJPEG(AVFrame *pFrame,char *path,  int width, int height, int iIndex) {
+
     // 输出文件路径
     char out_file[1000] = {0};
-    LOGD("path:%s", path);
+    //LOGD("path:%s", path);
     sprintf(out_file, "%stemp%d.jpg", path, iIndex);
-    LOGD("out_file:%s", out_file);
+    //LOGD("out_file:%s", out_file);
     // 分配AVFormatContext对象
     AVFormatContext *pFormatCtx = avformat_alloc_context();
 
@@ -182,6 +202,7 @@ int MyWriteJPEG(AVFrame *pFrame,char *path,  int width, int height, int iIndex) 
     pCodecCtx->time_base.num = 1;
     pCodecCtx->time_base.den = 25;
 
+
     // Begin Output some information
     av_dump_format(pFormatCtx, 0, out_file, 1);
     // End Output some information
@@ -197,6 +218,9 @@ int MyWriteJPEG(AVFrame *pFrame,char *path,  int width, int height, int iIndex) 
         LOGD("Could not open codec.");
         return -1;
     }
+
+    int ret2 = av_dict_set(&pFormatCtx->metadata,"rotate","90",0);
+    LOGD("tag 修改:%d",ret2);
 
     //Write Header
     avformat_write_header(pFormatCtx, NULL);
@@ -224,8 +248,7 @@ int MyWriteJPEG(AVFrame *pFrame,char *path,  int width, int height, int iIndex) 
 
     //Write Trailer
     av_write_trailer(pFormatCtx);
-
-    LOGD("Encode Successful.\n");
+    LOGD("Encode Successful.out_file:%s",out_file);
 
     if (pAVStream) {
         avcodec_close(pAVStream->codec);

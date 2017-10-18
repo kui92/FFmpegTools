@@ -8,6 +8,7 @@
 #include <jni.h>
 #include "com_mabeijianxi_jianxiffmpegcmd_Test.h"
 #include "com_esay_ffmtool_FfmpegTool.h"
+#include "fram_rotate.h"
 #include <android/log.h>
 
 #define  LOG_TAG    "ImageEncf"
@@ -116,7 +117,8 @@ JNIEXPORT jint JNICALL Java_com_esay_ffmtool_FfmpegTool_decodToImage
          LOGD("tag==null");
      }*/
     av_seek_frame(pFormatCtx, -1, count * AV_TIME_BASE, AVSEEK_FLAG_BACKWARD);
-
+    double rotate=get_rotation(pFormatCtx->streams[videoStream]);
+    LOGD("rotate:%d",rotate);
     while (av_read_frame(pFormatCtx, &packet) >= 0) {
         if (packet.stream_index == videoStream) {
             // Decode video frame
@@ -126,10 +128,13 @@ JNIEXPORT jint JNICALL Java_com_esay_ffmtool_FfmpegTool_decodToImage
                 if (count < (startTime + num)) {
                     if(pFrame->width>=800){
                         AVFrame *dst_picture = av_frame_clone(pFrame);
+
                         ScaleImg(pCodecCtx, pFrame, dst_picture, pFrame->height / 2,
                                  pFrame->width / 2);
-                        MyWriteJPEG(dst_picture, parent, dst_picture->width,
-                                    dst_picture->height, count);
+                        AVFrame *dst_picture2 = av_frame_clone(pFrame);
+                        frame_rotate_90(dst_picture,dst_picture2);
+                        MyWriteJPEG(dst_picture2, parent, dst_picture2->width,
+                                    dst_picture2->height, count);
                     } else{
                         MyWriteJPEG(pFrame, parent, pFrame->width,
                                     pFrame->height, count);
@@ -193,6 +198,7 @@ int ScaleImg(AVCodecContext *pCodecCtx, AVFrame *src_picture, AVFrame *dst_pictu
     sws_freeContext(m_pSwsContext);
     return 1;
 }
+
 
 
 /**

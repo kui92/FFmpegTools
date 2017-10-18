@@ -9,20 +9,22 @@
 #include "com_mabeijianxi_jianxiffmpegcmd_Test.h"
 #include "com_esay_ffmtool_FfmpegTool.h"
 #include <android/log.h>
+
 #define  LOG_TAG    "ImageEncf"
 #define  LOGD(...)  __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
+
 JNIEXPORT jint JNICALL
 Java_com_esay_ffmtool_FfmpegTool_cmdRun(JNIEnv *env, jobject type,
-        jobjectArray commands){
-    int argc = (*env)->GetArrayLength(env,commands);
+                                        jobjectArray commands) {
+    int argc = (*env)->GetArrayLength(env, commands);
     char *argv[argc];
     int i;
     for (i = 0; i < argc; i++) {
-        jstring js = (jstring) (*env)->GetObjectArrayElement(env,commands, i);
-        argv[i] = (char *) (*env)->GetStringUTFChars(env,js, 0);
+        jstring js = (jstring) (*env)->GetObjectArrayElement(env, commands, i);
+        argv[i] = (char *) (*env)->GetStringUTFChars(env, js, 0);
     }
     LOGD("Java_com_esay_ffmtool_FfmpegTool_cmdRun:");
-    return jxRun(argc,argv);
+    return jxRun(argc, argv);
 }
 
 JNIEXPORT jstring JNICALL
@@ -30,18 +32,18 @@ Java_com_mabeijianxi_jianxiffmpegcmd_MainActivity_getFFmpegConfig(JNIEnv *env, j
 
     char info[10000] = {0};
     sprintf(info, "%s\n", avcodec_configuration());
-    return (*env)->NewStringUTF(env,info);
+    return (*env)->NewStringUTF(env, info);
 
 }
 
 JNIEXPORT jint JNICALL Java_com_esay_ffmtool_FfmpegTool_decodToImage
-        (JNIEnv * env, jclass mclass, jstring in, jstring dir, jint startTime, jint num){
+        (JNIEnv *env, jclass mclass, jstring in, jstring dir, jint startTime, jint num) {
 
-    char * input=jstringTostring(env,in);
-    char * parent=jstringTostring(env,dir);
+    char *input = jstringTostring(env, in);
+    char *parent = jstringTostring(env, dir);
 
-    LOGD("input:%s",input);
-    LOGD("parent:%s",parent);
+    LOGD("input:%s", input);
+    LOGD("parent:%s", parent);
 
 
     av_register_all();
@@ -96,8 +98,8 @@ JNIEXPORT jint JNICALL Java_com_esay_ffmtool_FfmpegTool_decodToImage
     //(*pCodecCtx).
     AVPacket packet;
     AVDictionaryEntry *m = NULL;
-    while(m=av_dict_get(pFormatCtx->metadata,"",m,AV_DICT_IGNORE_SUFFIX)){
-        LOGD("key:%s    value:%s",m->key,m->value);
+    while (m = av_dict_get(pFormatCtx->metadata, "", m, AV_DICT_IGNORE_SUFFIX)) {
+        LOGD("key:%s    value:%s", m->key, m->value);
     }
 
     /*
@@ -112,24 +114,31 @@ JNIEXPORT jint JNICALL Java_com_esay_ffmtool_FfmpegTool_decodToImage
 
      } else{
          LOGD("tag==null");
-     }*/av_seek_frame(pFormatCtx,-1,count*AV_TIME_BASE,AVSEEK_FLAG_BACKWARD);
+     }*/
+    av_seek_frame(pFormatCtx, -1, count * AV_TIME_BASE, AVSEEK_FLAG_BACKWARD);
 
-    int ret=0;
-    while ((ret=av_read_frame(pFormatCtx, &packet))>= 0){
-        if (packet.stream_index == videoStream){
+    while (av_read_frame(pFormatCtx, &packet) >= 0) {
+        if (packet.stream_index == videoStream) {
             // Decode video frame
             avcodec_decode_video2(pCodecCtx, pFrame, &frameFinished, &packet);
             // 并不是decode一次就可解码出一帧
-            if (frameFinished){
-                if(count<(startTime+num)){
-
-                    MyWriteJPEG(pFrame,parent, pCodecCtx->width,
-                                pCodecCtx->height, count);
+            if (frameFinished) {
+                if (count < (startTime + num)) {
+                    if(pFrame->width>=800){
+                        AVFrame *dst_picture = av_frame_clone(pFrame);
+                        ScaleImg(pCodecCtx, pFrame, dst_picture, pFrame->height / 2,
+                                 pFrame->width / 2);
+                        MyWriteJPEG(dst_picture, parent, dst_picture->width,
+                                    dst_picture->height, count);
+                    } else{
+                        MyWriteJPEG(pFrame, parent, pFrame->width,
+                                    pFrame->height, count);
+                    }
                     ++count;
-                    av_seek_frame(pFormatCtx,-1,count*AV_TIME_BASE,AVSEEK_FLAG_BACKWARD);
-                } else{
+                    av_seek_frame(pFormatCtx, -1, count * AV_TIME_BASE, AVSEEK_FLAG_BACKWARD);
+                } else {
                     av_packet_unref(&packet);
-                    LOGD("break:count:%d   startTime:%d  num:%d",count,startTime,num);
+                    LOGD("break:count:%d   startTime:%d  num:%d", count, startTime, num);
                     break;
                 }
 
@@ -137,16 +146,53 @@ JNIEXPORT jint JNICALL Java_com_esay_ffmtool_FfmpegTool_decodToImage
         }
         av_packet_unref(&packet);
     }
-    LOGD(":count:%d   startTime:%d  num:%d  ret:%d",count,startTime,num,ret);
+    LOGD(":count:%d   startTime:%d  num:%d ", count, startTime, num);
     // Free the YUV frame
     av_free(pFrame);
     // Close the codecs
     avcodec_close(pCodecCtx);
     // Close the video file
     avformat_close_input(&pFormatCtx);
-    return  0;
+    return 0;
 }
 
+
+int ScaleImg(AVCodecContext *pCodecCtx, AVFrame *src_picture, AVFrame *dst_picture, int nDstH,
+             int nDstW) {
+    int nSrcStride[3];
+    int nSrcH = pCodecCtx->height;
+    int nSrcW = pCodecCtx->width;
+    struct SwsContext *m_pSwsContext;
+
+    nSrcStride[0] = nSrcW;
+    nSrcStride[1] = nSrcW / 2;
+    nSrcStride[2] = nSrcW / 2;
+
+    dst_picture->linesize[0] = nDstW;
+    dst_picture->linesize[1] = nDstW / 2;
+    dst_picture->linesize[2] = nDstW / 2;
+
+    dst_picture->width = nDstW;
+    dst_picture->height= nDstH;
+
+    m_pSwsContext = sws_getContext(nSrcW, nSrcH, src_picture->format,
+                                   nDstW, nDstH, src_picture->format,
+                                   SWS_BICUBIC,
+                                   NULL, NULL, NULL);
+
+    if (NULL == m_pSwsContext) {
+        printf("ffmpeg get context error!\n");
+        exit(-1);
+    }
+    int ret=sws_scale(m_pSwsContext, src_picture->data, src_picture->linesize, 0, pCodecCtx->height,
+              dst_picture->data, dst_picture->linesize);
+
+    LOGD("line0:%d line1:%d line2:%d\n", dst_picture->linesize[0], dst_picture->linesize[1],
+           dst_picture->linesize[2]);
+    //LOGD("-__ret:%d  ,dst_picture:%d   ,src_picture:%d",ret, sizeof(dst_picture),sizeof(src_picture));
+    sws_freeContext(m_pSwsContext);
+    return 1;
+}
 
 
 /**
@@ -156,8 +202,8 @@ JNIEXPORT jint JNICALL Java_com_esay_ffmtool_FfmpegTool_decodToImage
  * @param height YUV42的高
  *
  */
-int MyWriteJPEG(AVFrame *pFrame,char *path,  int width, int height, int iIndex) {
-
+int MyWriteJPEG(AVFrame *pFrame, char *path, int width, int height, int iIndex) {
+    LOGD("----------MyWriteJPEG width:%d  height:%d", width, height);
     // 输出文件路径
     char out_file[1000] = {0};
     //LOGD("path:%s", path);
@@ -195,7 +241,6 @@ int MyWriteJPEG(AVFrame *pFrame,char *path,  int width, int height, int iIndex) 
     // Begin Output some information
     av_dump_format(pFormatCtx, 0, out_file, 1);
     // End Output some information
-
     // 查找解码器
     AVCodec *pCodec = avcodec_find_encoder(pCodecCtx->codec_id);
     if (!pCodec) {
@@ -207,17 +252,13 @@ int MyWriteJPEG(AVFrame *pFrame,char *path,  int width, int height, int iIndex) 
         LOGD("Could not open codec.");
         return -1;
     }
-
     //Write Header
     avformat_write_header(pFormatCtx, NULL);
-
     int y_size = pCodecCtx->width * pCodecCtx->height;
-
     //Encode
     // 给AVPacket分配足够大的空间
     AVPacket pkt;
     av_new_packet(&pkt, y_size * 3);
-
     //
     int got_picture = 0;
     int ret = avcodec_encode_video2(pCodecCtx, &pkt, pFrame, &got_picture);
@@ -229,12 +270,11 @@ int MyWriteJPEG(AVFrame *pFrame,char *path,  int width, int height, int iIndex) 
         //pkt.stream_index = pAVStream->index;
         ret = av_write_frame(pFormatCtx, &pkt);
     }
-
     av_free_packet(&pkt);
 
     //Write Trailer
     av_write_trailer(pFormatCtx);
-    LOGD("Encode Successful.out_file:%s",out_file);
+    LOGD("Encode Successful.out_file:%s", out_file);
 
     if (pAVStream) {
         avcodec_close(pAVStream->codec);
@@ -246,21 +286,20 @@ int MyWriteJPEG(AVFrame *pFrame,char *path,  int width, int height, int iIndex) 
 }
 
 
-
 char *jstringTostring(JNIEnv *env, jstring jstr) {
     char *rtn = NULL;
-    jclass clsstring = (*env)->FindClass(env,"java/lang/String");
-    jstring strencode = (*env)->NewStringUTF(env,"utf-8");
-    jmethodID mid = (*env)->GetMethodID(env,clsstring, "getBytes", "(Ljava/lang/String;)[B");
-    jbyteArray barr = (jbyteArray) (*env)->CallObjectMethod(env,jstr, mid, strencode);
-    jsize alen = (*env)->GetArrayLength(env,barr);
-    jbyte *ba = (*env)->GetByteArrayElements(env,barr, JNI_FALSE);
+    jclass clsstring = (*env)->FindClass(env, "java/lang/String");
+    jstring strencode = (*env)->NewStringUTF(env, "utf-8");
+    jmethodID mid = (*env)->GetMethodID(env, clsstring, "getBytes", "(Ljava/lang/String;)[B");
+    jbyteArray barr = (jbyteArray) (*env)->CallObjectMethod(env, jstr, mid, strencode);
+    jsize alen = (*env)->GetArrayLength(env, barr);
+    jbyte *ba = (*env)->GetByteArrayElements(env, barr, JNI_FALSE);
     if (alen > 0) {
         rtn = (char *) malloc(alen + 1);
 
         memcpy(rtn, ba, alen);
         rtn[alen] = 0;
     }
-    (*env)->ReleaseByteArrayElements(env,barr, ba, 0);
+    (*env)->ReleaseByteArrayElements(env, barr, ba, 0);
     return rtn;
 }

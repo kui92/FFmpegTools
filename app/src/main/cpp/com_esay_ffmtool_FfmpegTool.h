@@ -22,6 +22,13 @@ JNIEXPORT jint JNICALL Java_com_esay_ffmtool_FfmpegTool_cmdRun
  */
 JNIEXPORT jint JNICALL Java_com_esay_ffmtool_FfmpegTool_decodToImage
   (JNIEnv *, jclass, jstring, jstring, jint, jint);
+/*
+ * Class:     com_esay_ffmtool_FfmpegTool
+ * Method:    decodToImageWithCall
+ * Signature: (Ljava/lang/String;Ljava/lang/String;II)I
+ */
+JNIEXPORT jint JNICALL Java_com_esay_ffmtool_FfmpegTool_decodToImageWithCall
+        (JNIEnv *, jobject, jstring, jstring, jint, jint);
 
 #ifdef __cplusplus
 }

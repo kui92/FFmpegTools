@@ -1,5 +1,6 @@
 package com.esay.ffmtool;
 
+import android.util.Log;
 /**
  * Created by ZBK on 2017/9/28.
  * Describe:
@@ -34,6 +35,15 @@ public class FfmpegTool {
      * @return 返回码 成功0
      */
     public static native int decodToImage(String srcPath,String savePath,int startTime,int count);
+
+
+
+    public void decodToImageCall(String path,int index){
+        Log.i("decodToImageCall","path:"+path+"___index:"+index);
+    }
+
+    public native int decodToImageWithCall(String srcPath,String savePath,int startTime,int count);
+
 
     //test
 

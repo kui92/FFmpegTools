@@ -131,10 +131,8 @@ JNIEXPORT jint JNICALL Java_com_esay_ffmtool_FfmpegTool_decodToImage
 
                         ScaleImg(pCodecCtx, pFrame, dst_picture, pFrame->height / 2,
                                  pFrame->width / 2);
-                        AVFrame *dst_picture2 = av_frame_clone(pFrame);
-                        frame_rotate_90(dst_picture,dst_picture2);
-                        MyWriteJPEG(dst_picture2, parent, dst_picture2->width,
-                                    dst_picture2->height, count);
+                        MyWriteJPEG(dst_picture, parent, dst_picture->width,
+                                    dst_picture->height, count);
                     } else{
                         MyWriteJPEG(pFrame, parent, pFrame->width,
                                     pFrame->height, count);
@@ -160,6 +158,124 @@ JNIEXPORT jint JNICALL Java_com_esay_ffmtool_FfmpegTool_decodToImage
     avformat_close_input(&pFormatCtx);
     return 0;
 }
+
+
+
+
+JNIEXPORT jint JNICALL Java_com_esay_ffmtool_FfmpegTool_decodToImageWithCall
+        (JNIEnv *env, jobject mclass, jstring in, jstring dir, jint startTime, jint num) {
+    char *input = jstringTostring(env, in);
+    char *parent = jstringTostring(env, dir);
+    jclass clazz =(*env)->FindClass(env,"com/esay/ffmtool/FfmpegTool");
+    if(clazz == 0){
+        LOGD("find class error");
+        return -1;
+    }
+    jmethodID methodId=(*env)->GetMethodID(env,clazz,"decodToImageCall","(Ljava/lang/String;I)V");
+    if(methodId == NULL){
+        LOGD("find methodId error");
+    }
+    LOGD("input:%s", input);
+    LOGD("parent:%s", parent);
+    av_register_all();
+    AVFormatContext *pFormatCtx = avformat_alloc_context();
+    // Open video file
+    if (avformat_open_input(&pFormatCtx, input, NULL, NULL) != 0) {
+        LOGD("Couldn't open file:%s\n", input);
+        return -1; // Couldn't open file
+    }
+
+    // Retrieve stream information
+    if (avformat_find_stream_info(pFormatCtx, NULL) < 0) {
+        LOGD("Couldn't find stream information.");
+        return -1;
+    }
+    // Find the first video stream
+    int videoStream = -1, i;
+    for (i = 0; i < pFormatCtx->nb_streams; i++) {
+        if (pFormatCtx->streams[i]->codec->codec_type == AVMEDIA_TYPE_VIDEO
+            && videoStream < 0) {
+            videoStream = i;
+        }
+    }
+    if (videoStream == -1) {
+        LOGD("Didn't find a video stream.");
+        return -1; // Didn't find a video stream
+    }
+    // Get a pointer to the codec context for the video stream
+    AVCodecContext *pCodecCtx = pFormatCtx->streams[videoStream]->codec;
+    // Find the decoder for the video stream
+    AVCodec *pCodec = avcodec_find_decoder(pCodecCtx->codec_id);
+    if (pCodec == NULL) {
+        LOGD("Codec not found.");
+        return -1; // Codec not found
+    }
+
+    if (avcodec_open2(pCodecCtx, pCodec, NULL) < 0) {
+        LOGD("Could not open codec.");
+        return -1; // Could not open codec
+    }
+    // Allocate video frame
+    AVFrame *pFrame = av_frame_alloc();
+
+    if (pFrame == NULL) {
+        LOGD("Could not allocate video frame.");
+        return -1;
+    }
+    int64_t count = startTime;
+    int frameFinished;
+    //(*pCodecCtx).
+    AVPacket packet;
+    AVDictionaryEntry *m = NULL;
+    while (m = av_dict_get(pFormatCtx->metadata, "", m, AV_DICT_IGNORE_SUFFIX)) {
+        LOGD("key:%s    value:%s", m->key, m->value);
+    }
+    av_seek_frame(pFormatCtx, -1, count * AV_TIME_BASE, AVSEEK_FLAG_BACKWARD);
+    double rotate=get_rotation(pFormatCtx->streams[videoStream]);
+    LOGD("rotate:%d",rotate);
+    while (av_read_frame(pFormatCtx, &packet) >= 0) {
+        if (packet.stream_index == videoStream) {
+            // Decode video frame
+            avcodec_decode_video2(pCodecCtx, pFrame, &frameFinished, &packet);
+            // 并不是decode一次就可解码出一帧
+            if (frameFinished) {
+                if (count < (startTime + num)) {
+                    char out_file[1000] = {0};
+                    sprintf(out_file, "%stemp%d.jpg", parent, count);
+                    if(pFrame->width>=800){
+                        AVFrame *dst_picture = av_frame_clone(pFrame);
+                        ScaleImg(pCodecCtx, pFrame, dst_picture, pFrame->height / 2,
+                                 pFrame->width / 2);
+                        MyWriteJPEG2(dst_picture, dst_picture->width,
+                                     dst_picture->height, out_file);
+                    } else{
+                        MyWriteJPEG2(pFrame, pFrame->width,
+                                    pFrame->height,out_file);
+                    }
+                    (*env)->CallVoidMethod(env,mclass,methodId,(*env)->NewStringUTF(env,out_file),count);
+                    ++count;
+                    av_seek_frame(pFormatCtx, -1, count * AV_TIME_BASE, AVSEEK_FLAG_BACKWARD);
+                } else {
+                    av_packet_unref(&packet);
+                    LOGD("break:count:%d   startTime:%d  num:%d", count, startTime, num);
+                    break;
+                }
+
+            }
+        }
+        av_packet_unref(&packet);
+    }
+    LOGD(":count:%d   startTime:%d  num:%d ", count, startTime, num);
+    // Free the YUV frame
+    av_free(pFrame);
+    // Close the codecs
+    avcodec_close(pCodecCtx);
+    // Close the video file
+    avformat_close_input(&pFormatCtx);
+    return 0;
+}
+
+
 
 
 int ScaleImg(AVCodecContext *pCodecCtx, AVFrame *src_picture, AVFrame *dst_picture, int nDstH,
@@ -199,7 +315,82 @@ int ScaleImg(AVCodecContext *pCodecCtx, AVFrame *src_picture, AVFrame *dst_pictu
     return 1;
 }
 
+int MyWriteJPEG2(AVFrame *pFrame, int width, int height,char * out_file) {
+    LOGD("----------MyWriteJPEG width:%d  height:%d", width, height);
+    // 分配AVFormatContext对象
+    AVFormatContext *pFormatCtx = avformat_alloc_context();
+    // 设置输出文件格式
+    pFormatCtx->oformat = av_guess_format("mjpeg", NULL, NULL);
+    // 创建并初始化一个和该url相关的AVIOContext
+    if (avio_open(&pFormatCtx->pb, out_file, AVIO_FLAG_READ_WRITE) < 0) {
+        LOGD("Couldn't open output file.");
+        return -1;
+    }
 
+    // 构建一个新stream
+    AVStream *pAVStream = avformat_new_stream(pFormatCtx, 0);
+    if (pAVStream == NULL) {
+        return -1;
+    }
+
+    // 设置该stream的信息
+    AVCodecContext *pCodecCtx = pAVStream->codec;
+
+    pCodecCtx->codec_id = pFormatCtx->oformat->video_codec;
+    pCodecCtx->codec_type = AVMEDIA_TYPE_VIDEO;
+    pCodecCtx->pix_fmt = AV_PIX_FMT_YUVJ420P;
+    pCodecCtx->width = width;
+    pCodecCtx->height = height;
+    pCodecCtx->time_base.num = 1;
+    pCodecCtx->time_base.den = 25;
+
+
+    // Begin Output some information
+    av_dump_format(pFormatCtx, 0, out_file, 1);
+    // End Output some information
+    // 查找解码器
+    AVCodec *pCodec = avcodec_find_encoder(pCodecCtx->codec_id);
+    if (!pCodec) {
+        LOGD("Codec not found.");
+        return -1;
+    }
+    // 设置pCodecCtx的解码器为pCodec
+    if (avcodec_open2(pCodecCtx, pCodec, NULL) < 0) {
+        LOGD("Could not open codec.");
+        return -1;
+    }
+    //Write Header
+    avformat_write_header(pFormatCtx, NULL);
+    int y_size = pCodecCtx->width * pCodecCtx->height;
+    //Encode
+    // 给AVPacket分配足够大的空间
+    AVPacket pkt;
+    av_new_packet(&pkt, y_size * 3);
+    //
+    int got_picture = 0;
+    int ret = avcodec_encode_video2(pCodecCtx, &pkt, pFrame, &got_picture);
+    if (ret < 0) {
+        LOGD("Encode Error.\n");
+        return -1;
+    }
+    if (got_picture == 1) {
+        //pkt.stream_index = pAVStream->index;
+        ret = av_write_frame(pFormatCtx, &pkt);
+    }
+    av_free_packet(&pkt);
+
+    //Write Trailer
+    av_write_trailer(pFormatCtx);
+    LOGD("Encode Successful.out_file:%s", out_file);
+
+    if (pAVStream) {
+        avcodec_close(pAVStream->codec);
+    }
+    avio_close(pFormatCtx->pb);
+    avformat_free_context(pFormatCtx);
+
+    return 0;
+}
 
 /**
  * 将AVFrame(YUV420格式)保存为JPEG格式的图片
@@ -212,6 +403,7 @@ int MyWriteJPEG(AVFrame *pFrame, char *path, int width, int height, int iIndex) 
     LOGD("----------MyWriteJPEG width:%d  height:%d", width, height);
     // 输出文件路径
     char out_file[1000] = {0};
+
     //LOGD("path:%s", path);
     sprintf(out_file, "%stemp%d.jpg", path, iIndex);
     //LOGD("out_file:%s", out_file);

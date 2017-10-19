@@ -11,18 +11,19 @@ import junit.framework.Test;
 
 import java.io.File;
 
+import static android.R.attr.path;
 import static com.esay.ffmtool.FfmpegTool.cmdRun;
 
 public class MainActivity extends AppCompatActivity {
 
     // Used to load the 'native-lib' library on application startup.
-
+    FfmpegTool  ffmpegTool;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
+        ffmpegTool=new FfmpegTool() ;
     }
 
     public void click1(View view){
@@ -56,8 +57,20 @@ public class MainActivity extends AppCompatActivity {
     public void click2(View view){
         String path= Environment.getExternalStorageDirectory().getPath()+ File.separator+"test"+File.separator;
         String video=path+"c.mp4";
-        FfmpegTool.decodToImage(video.replaceAll(File.separator,"/"),Environment.getExternalStorageDirectory().getPath()+ File.separator+"test2"+File.separator,0,30);
+        FfmpegTool.decodToImage(video.replaceAll(File.separator,"/"),Environment.getExternalStorageDirectory().getPath()+ File.separator+"test2"+File.separator,0,10);
     }
 
+    public void click3(View view){
+        new Thread(){
+            @Override
+            public void run() {
+                String path= Environment.getExternalStorageDirectory().getPath()+ File.separator+"test"+File.separator;
+                String video=path+"c.mp4";
+                ffmpegTool.decodToImageWithCall(video.replaceAll(File.separator,"/")
+                        ,Environment.getExternalStorageDirectory().getPath()
+                        + File.separator+"test2"+File.separator,0,10);
+            }
+        }.start();
+    }
 
 }

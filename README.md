@@ -48,3 +48,21 @@ decodToImage用法
     String video=path+"c.mp4";
  
     FfmpegTool.decodToImage(video.replaceAll(File.separator,"/"),path.replaceAll(File.separator,"/"),0,60);
+
+//新加方法
+public native int decodToImageWithCall(String srcPath,String savePath,int startTime,int count);
+该方法与decodToImage功能相同，不过该方法添加了jni回调，每当有一幅图片解码保存完成后都会调用public void decodToImageCall(String path,int index)（类FfmpegTool中的方法），用户可根据该方法监听进度。
+用法：
+
+        FfmpegTool  ffmpegTool=new FfmpegTool() ;
+        
+        new Thread(){
+            @Override
+            public void run() {
+                String path= Environment.getExternalStorageDirectory().getPath()+ File.separator+"test"+File.separator;
+                String video=path+"c.mp4";
+                ffmpegTool.decodToImageWithCall(video.replaceAll(File.separator,"/")
+                        ,Environment.getExternalStorageDirectory().getPath()
+                        + File.separator+"test2"+File.separator,0,10);
+            }
+        }.start();

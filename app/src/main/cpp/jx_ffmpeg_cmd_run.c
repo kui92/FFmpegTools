@@ -257,7 +257,6 @@ JNIEXPORT jint JNICALL Java_com_esay_ffmtool_FfmpegTool_decodToImageWithCall
                     av_seek_frame(pFormatCtx, -1, count * AV_TIME_BASE, AVSEEK_FLAG_BACKWARD);
                 } else {
                     av_packet_unref(&packet);
-                    LOGD("break:count:%d   startTime:%d  num:%d", count, startTime, num);
                     break;
                 }
 

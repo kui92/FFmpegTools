@@ -6,15 +6,15 @@ android {
     defaultConfig {
         applicationId "com.esay.ffmtool"
         minSdkVersion 19
-        targetSdkVersion 22
+        targetSdkVersion 21
         versionCode 1
         versionName "1.0"
         externalNativeBuild {
             cmake {
                 cppFlags ""
             }
-            ndk{
-                abiFilters "armeabi","armeabi-v7a","arm64-v8a"
+            ndk {
+                abiFilters "armeabi", "armeabi-v7a", "arm64-v8a"
             }
         }
     }
@@ -32,6 +32,8 @@ android {
         cmake {
             path "CMakeLists.txt"
         }
+    }
+    productFlavors {
     }
 }
 

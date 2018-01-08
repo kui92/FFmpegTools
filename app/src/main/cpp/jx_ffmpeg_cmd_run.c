@@ -240,17 +240,17 @@ JNIEXPORT jint JNICALL Java_com_esay_ffmtool_FfmpegTool_decodToImageWithCall
             // 并不是decode一次就可解码出一帧
             if (frameFinished) {
                 if (count < (startTime + num)) {
-                    char out_file[1000] = {0};
-                    sprintf(out_file, "%stemp%d.jpg", parent, count);
+                    char* out_file=NULL;
+
                     if(pFrame->width>=800){
                         AVFrame *dst_picture = av_frame_clone(pFrame);
                         ScaleImg(pCodecCtx, pFrame, dst_picture, pFrame->height / 2,
                                  pFrame->width / 2);
-                        MyWriteJPEG2(dst_picture, dst_picture->width,
-                                     dst_picture->height, out_file);
+                        out_file=MyWriteJPEG2(pFrame,parent, pFrame->width,
+                                     pFrame->height,count);
                     } else{
-                        MyWriteJPEG2(pFrame, pFrame->width,
-                                    pFrame->height,out_file);
+                        out_file=MyWriteJPEG2(pFrame,parent, pFrame->width,
+                                    pFrame->height,count);
                     }
                     (*env)->CallVoidMethod(env,mclass,methodId,(*env)->NewStringUTF(env,out_file),count);
                     ++count;
@@ -314,8 +314,14 @@ int ScaleImg(AVCodecContext *pCodecCtx, AVFrame *src_picture, AVFrame *dst_pictu
     return 1;
 }
 
-int MyWriteJPEG2(AVFrame *pFrame, int width, int height,char * out_file) {
-    LOGD("----------MyWriteJPEG width:%d  height:%d", width, height);
+char * MyWriteJPEG2(AVFrame *pFrame,char *path, int width, int height,int iIndex) {
+    LOGD("----------MyWriteJPEG width:%d  height:%d  iIndex:%d", width, height,iIndex);
+    // 输出文件路径
+    char out_file[1000] = {0};
+
+    //LOGD("path:%s", path);
+    sprintf(out_file, "%stemp%d.jpg", path, iIndex);
+    LOGD("----------MyWriteJPEG width:%d  height:%d  out_file:%s", width, height,out_file);
     // 分配AVFormatContext对象
     AVFormatContext *pFormatCtx = avformat_alloc_context();
     // 设置输出文件格式
@@ -388,7 +394,7 @@ int MyWriteJPEG2(AVFrame *pFrame, int width, int height,char * out_file) {
     avio_close(pFormatCtx->pb);
     avformat_free_context(pFormatCtx);
 
-    return 0;
+    return out_file;
 }
 
 /**
@@ -399,7 +405,7 @@ int MyWriteJPEG2(AVFrame *pFrame, int width, int height,char * out_file) {
  *
  */
 int MyWriteJPEG(AVFrame *pFrame, char *path, int width, int height, int iIndex) {
-    LOGD("----------MyWriteJPEG width:%d  height:%d", width, height);
+    LOGD("----------MyWriteJPEG width:%d  height:%d  iIndex:%d", width, height,iIndex);
     // 输出文件路径
     char out_file[1000] = {0};
 

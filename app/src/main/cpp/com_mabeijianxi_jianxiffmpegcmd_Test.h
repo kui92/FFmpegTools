@@ -8,8 +8,8 @@
 extern "C" {
 #endif
 int MyWriteJPEG(AVFrame *pFrame,char *path, int width, int height, int iIndex);
-int MyWriteJPEG2(AVFrame *pFrame, int width, int height,char * out_file);
-char *jstringTostring(JNIEnv *env, jstring jstr);
+char * MyWriteJPEG2(AVFrame *pFrame,char *path, int width, int height,int iIndex);
+        char *jstringTostring(JNIEnv *env, jstring jstr);
 #ifdef __cplusplus
 }
 #endif

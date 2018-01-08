@@ -56,8 +56,13 @@ public class MainActivity extends AppCompatActivity {
 
     public void click2(View view){
         String path= Environment.getExternalStorageDirectory().getPath()+ File.separator+"test"+File.separator;
+        String savepah=Environment.getExternalStorageDirectory().getPath()+ File.separator+"test2"+File.separator;
+        File file=new File(savepah);
+        if (!file.exists()){
+            file.mkdirs();
+        }
         String video=path+"c.mp4";
-        FfmpegTool.decodToImage(video.replaceAll(File.separator,"/"),Environment.getExternalStorageDirectory().getPath()+ File.separator+"test2"+File.separator,0,10);
+        FfmpegTool.decodToImage(video.replaceAll(File.separator,"/"),savepah,0,10);
     }
 
     public void click3(View view){

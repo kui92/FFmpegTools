@@ -161,7 +161,16 @@ JNIEXPORT jint JNICALL Java_com_esay_ffmtool_FfmpegTool_decodToImage
 
 
 
-
+/**
+ * 带回调
+ * @param env
+ * @param mclass
+ * @param in
+ * @param dir
+ * @param startTime
+ * @param num
+ * @return
+ */
 JNIEXPORT jint JNICALL Java_com_esay_ffmtool_FfmpegTool_decodToImageWithCall
         (JNIEnv *env, jobject mclass, jstring in, jstring dir, jint startTime, jint num) {
     char *input = jstringTostring(env, in);
@@ -246,14 +255,17 @@ JNIEXPORT jint JNICALL Java_com_esay_ffmtool_FfmpegTool_decodToImageWithCall
                         AVFrame *dst_picture = av_frame_clone(pFrame);
                         ScaleImg(pCodecCtx, pFrame, dst_picture, pFrame->height / 2,
                                  pFrame->width / 2);
-                        out_file=MyWriteJPEG2(pFrame,parent, pFrame->width,
+                        out_file=MyWriteJPEG2(dst_picture,parent, pFrame->width,
                                      pFrame->height,count);
+                       av_frame_free(&dst_picture);
                     } else{
                         out_file=MyWriteJPEG2(pFrame,parent, pFrame->width,
                                     pFrame->height,count);
                     }
+
                     (*env)->CallVoidMethod(env,mclass,methodId,(*env)->NewStringUTF(env,out_file),count);
                     ++count;
+                    free(out_file);
                     av_seek_frame(pFormatCtx, -1, count * AV_TIME_BASE, AVSEEK_FLAG_BACKWARD);
                 } else {
                     av_packet_unref(&packet);
@@ -264,7 +276,7 @@ JNIEXPORT jint JNICALL Java_com_esay_ffmtool_FfmpegTool_decodToImageWithCall
         }
         av_packet_unref(&packet);
     }
-    LOGD(":count:%d   startTime:%d  num:%d ", count, startTime, num);
+    LOGD("开始释放内存");
     // Free the YUV frame
     av_free(pFrame);
     // Close the codecs
@@ -279,6 +291,7 @@ JNIEXPORT jint JNICALL Java_com_esay_ffmtool_FfmpegTool_decodToImageWithCall
 
 int ScaleImg(AVCodecContext *pCodecCtx, AVFrame *src_picture, AVFrame *dst_picture, int nDstH,
              int nDstW) {
+    LOGD("-----------ScaleImg------------");
     int nSrcStride[3];
     int nSrcH = pCodecCtx->height;
     int nSrcW = pCodecCtx->width;
@@ -315,13 +328,13 @@ int ScaleImg(AVCodecContext *pCodecCtx, AVFrame *src_picture, AVFrame *dst_pictu
 }
 
 char * MyWriteJPEG2(AVFrame *pFrame,char *path, int width, int height,int iIndex) {
-    LOGD("----------MyWriteJPEG width:%d  height:%d  iIndex:%d", width, height,iIndex);
+    LOGD("----------MyWriteJPEG2 width:%d  height:%d  iIndex:%d", width, height,iIndex);
     // 输出文件路径
-    char out_file[1000] = {0};
+    char *out_file = malloc(1000);
 
     //LOGD("path:%s", path);
     sprintf(out_file, "%stemp%d.jpg", path, iIndex);
-    LOGD("----------MyWriteJPEG width:%d  height:%d  out_file:%s", width, height,out_file);
+    //LOGD("----------MyWriteJPEG width:%d  height:%d  out_file:%s", width, height,out_file);
     // 分配AVFormatContext对象
     AVFormatContext *pFormatCtx = avformat_alloc_context();
     // 设置输出文件格式

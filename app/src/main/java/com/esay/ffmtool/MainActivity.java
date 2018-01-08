@@ -70,10 +70,15 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void run() {
                 String path= Environment.getExternalStorageDirectory().getPath()+ File.separator+"test"+File.separator;
+                String path2=Environment.getExternalStorageDirectory().getPath()
+                        + File.separator+"test2"+File.separator;
+                File file=new File(path2);
+                if (!file.exists()){
+                    file.mkdirs();
+                }
                 String video=path+"c.mp4";
                 ffmpegTool.decodToImageWithCall(video.replaceAll(File.separator,"/")
-                        ,Environment.getExternalStorageDirectory().getPath()
-                        + File.separator+"test2"+File.separator,0,10);
+                        ,path2,0,10);
             }
         }.start();
     }

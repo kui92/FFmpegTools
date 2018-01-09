@@ -181,6 +181,7 @@ JNIEXPORT jint JNICALL Java_com_esay_ffmtool_FfmpegTool_decodToImageWithCall
         return -1;
     }
     jmethodID methodId=(*env)->GetMethodID(env,clazz,"decodToImageCall","(Ljava/lang/String;I)V");
+
     if(methodId == NULL){
         LOGD("find methodId error");
     }
@@ -235,13 +236,13 @@ JNIEXPORT jint JNICALL Java_com_esay_ffmtool_FfmpegTool_decodToImageWithCall
     int frameFinished;
     //(*pCodecCtx).
     AVPacket packet;
-    AVDictionaryEntry *m = NULL;
+    /*AVDictionaryEntry *m = NULL;
     while (m = av_dict_get(pFormatCtx->metadata, "", m, AV_DICT_IGNORE_SUFFIX)) {
         LOGD("key:%s    value:%s", m->key, m->value);
-    }
+    }*/
     av_seek_frame(pFormatCtx, -1, count * AV_TIME_BASE, AVSEEK_FLAG_BACKWARD);
-    double rotate=get_rotation(pFormatCtx->streams[videoStream]);
-    LOGD("rotate:%d",rotate);
+    /*double rotate=get_rotation(pFormatCtx->streams[videoStream]);
+    LOGD("rotate:%d",rotate);*/
     while (av_read_frame(pFormatCtx, &packet) >= 0) {
         if (packet.stream_index == videoStream) {
             // Decode video frame
@@ -255,8 +256,8 @@ JNIEXPORT jint JNICALL Java_com_esay_ffmtool_FfmpegTool_decodToImageWithCall
                         AVFrame *dst_picture = av_frame_clone(pFrame);
                         ScaleImg(pCodecCtx, pFrame, dst_picture, pFrame->height / 2,
                                  pFrame->width / 2);
-                        out_file=MyWriteJPEG2(dst_picture,parent, pFrame->width,
-                                     pFrame->height,count);
+                        out_file=MyWriteJPEG2(dst_picture,parent, dst_picture->width,
+                                              dst_picture->height,count);
                        av_frame_free(&dst_picture);
                     } else{
                         out_file=MyWriteJPEG2(pFrame,parent, pFrame->width,
@@ -277,12 +278,17 @@ JNIEXPORT jint JNICALL Java_com_esay_ffmtool_FfmpegTool_decodToImageWithCall
         av_packet_unref(&packet);
     }
     LOGD("开始释放内存");
+    LOGD("DeleteLocalRef. clazz");
+    (*env)->DeleteLocalRef(env,clazz);
+    free(input);
+    free(parent);
     // Free the YUV frame
     av_free(pFrame);
     // Close the codecs
     avcodec_close(pCodecCtx);
     // Close the video file
     avformat_close_input(&pFormatCtx);
+
     return 0;
 }
 
@@ -351,6 +357,8 @@ char * MyWriteJPEG2(AVFrame *pFrame,char *path, int width, int height,int iIndex
         return -1;
     }
 
+
+
     // 设置该stream的信息
     AVCodecContext *pCodecCtx = pAVStream->codec;
 
@@ -368,6 +376,8 @@ char * MyWriteJPEG2(AVFrame *pFrame,char *path, int width, int height,int iIndex
     // End Output some information
     // 查找解码器
     AVCodec *pCodec = avcodec_find_encoder(pCodecCtx->codec_id);
+
+
     if (!pCodec) {
         LOGD("Codec not found.");
         return -1;
